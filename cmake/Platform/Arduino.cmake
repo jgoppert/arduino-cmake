@@ -6,7 +6,7 @@
 #
 # The arguments are as follows:
 #
-#      NAME           # The name of the firmware target [REQUIRED]
+#      FIRMWARE       # The name of the firmware target [REQUIRED]
 #      BOARD          # Board name (such as uno, mega2560, ...) [REQUIRED]
 #      SRCS           # Sources [must have SRCS or SKETCH]
 #      SKETCH         # Arduino sketch [must have SRCS or SKETCH]
@@ -19,7 +19,7 @@
 # Here is a short example for a target named test:
 #    
 #       generate_arduino_firmware(
-#           NAME test
+#           FIRMWARE test
 #           SRCS test.cpp 
 #                test2.cpp
 #           HDRS test.h test2.h
@@ -153,6 +153,7 @@ endfunction()
 # see documentation at top
 #=============================================================================#
 function(GENERATE_ARDUINO_LIBRARY TARGET_NAME)
+
     cmake_parse_arguments(INPUT "NO_AUTOLIBS" "NAME;BOARD" "SRCS;HDRS;LIBS" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_NAME MSG "must define name for library")
@@ -187,11 +188,12 @@ endfunction()
 # see documentation at top
 #=============================================================================#
 function(GENERATE_ARDUINO_FIRMWARE)
-    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "NAME;BOARD;PORT;SKETCH;SERIAL" "SRCS;HDRS;LIBS;AFLAGS" ${ARGN})
+
+    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;HDRS;LIBS;AFLAGS" ${ARGN})
     error_for_unparsed(INPUT)
-    required_variables(VARS INPUT_NAME MSG "must define name for target")
-    message(STATUS "Generating ${INPUT_NAME}")
-    required_variables(VARS INPUT_BOARD MSG "must define for target ${INPUT_NAME}")
+    required_variables(VARS INPUT_FIRMWARE MSG "must define name for target")
+    message(STATUS "Generating ${INPUT_FIRMWARE}")
+    required_variables(VARS INPUT_BOARD MSG "must define for target ${INPUT_FIRMWARE}")
 
     set(ALL_LIBS)
     set(ALL_SRCS ${INPUT_SRCS} ${INPUT_HDRS})
@@ -202,7 +204,7 @@ function(GENERATE_ARDUINO_FIRMWARE)
         setup_arduino_sketch(${INPUT_SKETCH} ALL_SRCS)
     endif()
 
-    required_variables(VARS ALL_SRCS MSG "must define SRCS or SKETCH for target ${INPUT_NAME}")
+    required_variables(VARS ALL_SRCS MSG "must define SRCS or SKETCH for target ${INPUT_FIRMWARE}")
 
     find_arduino_libraries(TARGET_LIBS "${ALL_SRCS}")
     set(LIB_DEP_INCLUDES)
@@ -216,14 +218,19 @@ function(GENERATE_ARDUINO_FIRMWARE)
     
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
     
-    setup_arduino_target(${INPUT_NAME} ${INPUT_BOARD} "${ALL_SRCS}" "${ALL_LIBS}" "-I${INPUT_SKETCH} ${LIB_DEP_INCLUDES}" "")
+    setup_arduino_target(
+        TARGET "${INPUT_FIRMWARE}"
+        BOARD "${INPUT_BOARD}"
+        SRCS "${ALL_SRCS}"
+        LIBS "${ALL_LIBS}"
+        COMPILE_FLAGS "-I${INPUT_SKETCH} ${LIB_DEP_INCLUDES}")
     
     if(INPUT_PORT)
-        setup_arduino_upload(${INPUT_BOARD} ${INPUT_NAME} ${INPUT_PORT})
+        setup_arduino_upload(${INPUT_BOARD} ${INPUT_FIRMWARE} ${INPUT_PORT})
     endif()
     
     if(INPUT_SERIAL)
-        setup_serial_target(${INPUT_NAME} "${INPUT_SERIAL}")
+        setup_serial_target(${INPUT_FIRMWARE} "${INPUT_SERIAL}")
     endif()
 
 endfunction()
@@ -231,25 +238,27 @@ endfunction()
 #=============================================================================#
 # [PUBLIC/USER]
 #
-# generate_arduino_example(LIBRARY_NAME EXAMPLE_NAME BOARD_ID [PORT] [SERIAL])
+# generate_arduino_example()
 #
 # see documentation at top
 #=============================================================================#
-function(GENERATE_ARDUINO_EXAMPLE LIBRARY_NAME EXAMPLE_NAME BOARD_ID)
+function(GENERATE_ARDUINO_EXAMPLE)
 
-    set(TARGET_NAME "example-${LIBRARY_NAME}-${EXAMPLE_NAME}")
+    cmake_parse_arguments(INPUT "" "LIBRARY;EXAMPLE;BOARD;PORT;SERIAL" "" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_EXAMPLE MSG "must define name for example")
+    required_variables(VARS INPUT_BOARD INPUT_LIBRARY MSG "must define for example ${INPUT_EXAMPLE}")
 
-    message(STATUS "Generating example ${LIBRARY_NAME}-${EXAMPLE_NAME}")
+    set(TARGET_NAME "example-${INPUT_LIBRARY}-${INPUT_EXAMPLE}")
+
+    message(STATUS "Generating ${TARGET_NAME}")
 
     set(ALL_LIBS)
     set(ALL_SRCS)
 
-    set(INPUT_PORT  ${ARGV3})
-    set(INPUT_SERIAL ${ARGV4})
+    setup_arduino_core(CORE_LIB "${INPUT_BOARD}")
 
-    setup_arduino_core(CORE_LIB ${BOARD_ID})
-
-    setup_arduino_example("${LIBRARY_NAME}" "${EXAMPLE_NAME}" ALL_SRCS)
+    setup_arduino_example("${INPUT_LIBRARY}" "${INPUT_EXAMPLE}" ALL_SRCS)
 
     if(NOT ALL_SRCS)
         message(FATAL_ERROR "Missing sources for example, aborting!")
@@ -261,14 +270,19 @@ function(GENERATE_ARDUINO_EXAMPLE LIBRARY_NAME EXAMPLE_NAME BOARD_ID)
         set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
     endforeach()
 
-    setup_arduino_libraries(ALL_LIBS ${BOARD_ID} "${ALL_SRCS}" "${LIB_DEP_INCLUDES}" "")
+    setup_arduino_libraries(ALL_LIBS "${INPUT_BOARD}" "${ALL_SRCS}" "${LIB_DEP_INCLUDES}" "")
 
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
     
-    setup_arduino_target(${TARGET_NAME} "${ALL_SRCS}" "${ALL_LIBS}" "${LIB_DEP_INCLUDES}" "")
+    setup_arduino_target(
+        TARGET "${TARGET_NAME}"
+        BOARD "${INPUT_BOARD}"
+        SRCS "${ALL_SRCS}"
+        LIBS "${ALL_LIBS}"
+        COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
 
     if(INPUT_PORT)
-        setup_arduino_upload(${BOARD_ID} ${TARGET_NAME} ${INPUT_PORT})
+        setup_arduino_upload(${INPUT_BOARD} ${TARGET_NAME} ${INPUT_PORT})
     endif()
     
     if(INPUT_SERIAL)
@@ -303,38 +317,6 @@ endfunction()
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# load_generator_settings(TARGET_NAME PREFIX [SUFFIX_1 SUFFIX_2 .. SUFFIX_N])
-#
-#         TARGET_NAME - The base name of the user settings
-#         PREFIX      - The prefix name used for generator settings
-#         SUFFIX_XX   - List of suffixes to load
-#
-#  Loads a list of user settings into the generators scope. User settings have
-#  the following syntax:
-#
-#      ${BASE_NAME}${SUFFIX}
-#
-#  The BASE_NAME is the target name and the suffix is a specific generator settings.
-#
-#  For every user setting found a generator setting is created of the follwoing fromat:
-#
-#      ${PREFIX}${SUFFIX}
-#
-#  The purpose of loading the settings into the generator is to not modify user settings
-#  and to have a generic naming of the settings within the generator.
-#
-#=============================================================================#
-function(LOAD_GENERATOR_SETTINGS TARGET_NAME PREFIX)
-    foreach(GEN_SUFFIX ${ARGN})
-        if(${TARGET_NAME}${GEN_SUFFIX})
-            set(${PREFIX}${GEN_SUFFIX} ${${TARGET_NAME}${GEN_SUFFIX}} PARENT_SCOPE)
-        endif()
-    endforeach()
-endfunction()
-
-#=============================================================================#
-# [PRIVATE/INTERNAL]
-#
 # get_arduino_flags(COMPILE_FLAGS LINK_FLAGS BOARD_ID)
 #
 #       COMPILE_FLAGS_VAR -Variable holding compiler flags
@@ -363,8 +345,14 @@ function(get_arduino_flags COMPILE_FLAGS_VAR LINK_FLAGS_VAR BOARD_ID)
         endif()
 
         # output
-        set(COMPILE_FLAGS "-DF_CPU=${${BOARD_ID}.build.f_cpu} -DARDUINO=${ARDUINO_VERSION_DEFINE} -mmcu=${${BOARD_ID}.build.mcu} -I${ARDUINO_CORES_PATH}/${BOARD_CORE} -I${ARDUINO_LIBRARIES_PATH}")
-        set(LINK_FLAGS "-mmcu=${${BOARD_ID}.build.mcu}")
+        set(COMPILE_FLAGS "-DF_CPU=${${BOARD_ID}.build.f_cpu} -DARDUINO=${ARDUINO_VERSION_DEFINE} -I${ARDUINO_CORES_PATH}/${BOARD_CORE} -I${ARDUINO_LIBRARIES_PATH} ${ARDUINO_TOOLCHAIN_COMPILE_FLAGS}")
+        set(LINK_FLAGS "")
+
+        if ("${CMAKE_C_COMPILER}" STREQUAL "avr-gcc")
+            set(COMPILE_FLAGS "${COMPILE_FLAGS} -mmcu=${${BOARD_ID}.build.mcu}")
+            set(LINK_FLAGS "${LINK_FLAGS} -mmcu=${${BOARD_ID}.build.mcu}")
+        endif()
+
         if(ARDUINO_SDK_VERSION VERSION_GREATER 1.0 OR ARDUINO_SDK_VERSION VERSION_EQUAL 1.0)
             set(PIN_HEADER ${${BOARD_ID}.build.variant})
             set(COMPILE_FLAGS "${COMPILE_FLAGS} -I${ARDUINO_VARIANTS_PATH}/${PIN_HEADER}")
@@ -558,33 +546,38 @@ endfunction()
 # setup_arduino_target(TARGET_NAME ALL_SRCS ALL_LIBS COMPILE_FLAGS LINK_FLAGS)
 #
 #        TARGET_NAME - Target name
-#        BOARD_ID - The arduino board
-#        ALL_SRCS    - All sources
-#        ALL_LIBS    - All libraries
+#        BOARD - The arduino board
+#        SRCS    - All sources
+#        LIBS    - All libraries
 #        COMPILE_FLAGS    - Compile flags
 #        LINK_FLAGS    - Linker flags
 #
 # Creates an Arduino firmware target.
 #
 #=============================================================================#
-function(setup_arduino_target TARGET_NAME BOARD_ID ALL_SRCS ALL_LIBS COMPILE_FLAGS LINK_FLAGS)
+function(setup_arduino_target)
 
-    foreach(LIB_DEP ${ALL_LIBS})
+    cmake_parse_arguments(INPUT "" "TARGET;BOARD" "SRCS;LIBS;COMPILE_FLAGS;LINK_FLAGS" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_TARGET INPUT_BOARD INPUT_SRCS MSG "must define name for library")
+
+    set(LIB_DEP_INCLUDES "")
+    foreach(LIB_DEP ${INPUT_LIBS})
         set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
     endforeach()
 
-    add_executable(${TARGET_NAME} ${ALL_SRCS})
-    set_target_properties(${TARGET_NAME} PROPERTIES SUFFIX ".elf")
+    add_executable(${INPUT_TARGET} ${INPUT_SRCS})
+    set_target_properties(${INPUT_TARGET} PROPERTIES SUFFIX ".elf")
 
-    get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS  ${BOARD_ID})
+    get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS  ${INPUT_BOARD})
 
-    set_target_properties(${TARGET_NAME} PROPERTIES
-                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${COMPILE_FLAGS} ${LIB_DEP_INCLUDES}"
-                LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
-    target_link_libraries(${TARGET_NAME} ${ALL_LIBS} "-lc -lm")
+    set_target_properties(${INPUT_TARGET} PROPERTIES
+                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${INPUT_COMPILE_FLAGS} ${LIB_DEP_INCLUDES}"
+                LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${INPUT_LINK_FLAGS}")
+    target_link_libraries(${INPUT_TARGET} ${INPUT_LIBS} "-lc -lm")
 
-    set(TARGET_PATH ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME})
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+    set(TARGET_PATH ${CMAKE_CURRENT_BINARY_DIR}/${INPUT_TARGET})
+    add_custom_command(TARGET ${INPUT_TARGET} POST_BUILD
                         COMMAND ${CMAKE_OBJCOPY}
                         ARGS     ${ARDUINO_OBJCOPY_EEP_FLAGS}
                                  ${TARGET_PATH}.elf
@@ -593,7 +586,7 @@ function(setup_arduino_target TARGET_NAME BOARD_ID ALL_SRCS ALL_LIBS COMPILE_FLA
                         VERBATIM)
 
     # Convert firmware image to ASCII HEX format
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+    add_custom_command(TARGET ${INPUT_TARGET} POST_BUILD
                         COMMAND ${CMAKE_OBJCOPY}
                         ARGS    ${ARDUINO_OBJCOPY_HEX_FLAGS}
                                 ${TARGET_PATH}.elf
@@ -602,20 +595,20 @@ function(setup_arduino_target TARGET_NAME BOARD_ID ALL_SRCS ALL_LIBS COMPILE_FLA
                         VERBATIM)
 
     # Display target size
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+    add_custom_command(TARGET ${INPUT_TARGET} POST_BUILD
                         COMMAND ${CMAKE_COMMAND}
                         ARGS    -DFIRMWARE_IMAGE=${TARGET_PATH}.hex
                                 -P ${ARDUINO_SIZE_SCRIPT}
                         COMMENT "Calculating image size"
                         VERBATIM)
 
-    # Create ${TARGET_NAME}-size target
-    add_custom_target(${TARGET_NAME}-size
+    # Create ${INPUT_TARGET}-size target
+    add_custom_target(${INPUT_TARGET}-size
                         COMMAND ${CMAKE_COMMAND}
                                 -DFIRMWARE_IMAGE=${TARGET_PATH}.hex
                                 -P ${ARDUINO_SIZE_SCRIPT}
-                        DEPENDS ${TARGET_NAME}
-                        COMMENT "Calculating ${TARGET_NAME} image size")
+                        DEPENDS ${INPUT_TARGET}
+                        COMMENT "Calculating ${INPUT_TARGET} image size")
 endfunction()
 
 #=============================================================================#
@@ -1405,52 +1398,6 @@ function(ERROR_FOR_UNPARSED PREFIX)
 endfunction()
 
 #=============================================================================#
-#                              C Flags                                        
-#=============================================================================#
-set(ARDUINO_C_FLAGS "-mcall-prologues -ffunction-sections -fdata-sections")
-set(CMAKE_C_FLAGS                "-g -Os       ${ARDUINO_C_FLAGS}"    CACHE STRING "")
-set(CMAKE_C_FLAGS_DEBUG          "-g           ${ARDUINO_C_FLAGS}"    CACHE STRING "")
-set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG ${ARDUINO_C_FLAGS}"    CACHE STRING "")
-set(CMAKE_C_FLAGS_RELEASE        "-Os -DNDEBUG -w ${ARDUINO_C_FLAGS}" CACHE STRING "")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-Os -g       -w ${ARDUINO_C_FLAGS}" CACHE STRING "")
-
-#=============================================================================#
-#                             C++ Flags                                       
-#=============================================================================#
-set(ARDUINO_CXX_FLAGS "${ARDUINO_C_FLAGS} -fno-exceptions")
-set(CMAKE_CXX_FLAGS                "-g -Os       ${ARDUINO_CXX_FLAGS}" CACHE STRING "")
-set(CMAKE_CXX_FLAGS_DEBUG          "-g           ${ARDUINO_CXX_FLAGS}" CACHE STRING "")
-set(CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG ${ARDUINO_CXX_FLAGS}" CACHE STRING "")
-set(CMAKE_CXX_FLAGS_RELEASE        "-Os -DNDEBUG ${ARDUINO_CXX_FLAGS}" CACHE STRING "")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Os -g       ${ARDUINO_CXX_FLAGS}" CACHE STRING "")
-
-#=============================================================================#
-#                       Executable Linker Flags                               #
-#=============================================================================#
-set(ARDUINO_LINKER_FLAGS "-Wl,--gc-sections -lm")
-set(CMAKE_EXE_LINKER_FLAGS                "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_EXE_LINKER_FLAGS_DEBUG          "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL     "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE        "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-
-#=============================================================================#
-#=============================================================================#
-#                       Shared Lbrary Linker Flags                            #
-#=============================================================================#
-set(CMAKE_SHARED_LINKER_FLAGS                "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_SHARED_LINKER_FLAGS_DEBUG          "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL     "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE        "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-
-set(CMAKE_MODULE_LINKER_FLAGS                "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_MODULE_LINKER_FLAGS_DEBUG          "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL     "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_MODULE_LINKER_FLAGS_RELEASE        "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-set(CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
-
-#=============================================================================#
 #                         System Paths                                        #
 #=============================================================================#
 if(UNIX)
@@ -1616,5 +1563,4 @@ if(NOT ARDUINO_FOUND)
         ARDUINO_OBJCOPY_HEX_FLAGS
         AVRSIZE_PROGRAM)
 endif()
-
 

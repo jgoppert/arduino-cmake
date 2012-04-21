@@ -1,12 +1,10 @@
-set(CMAKE_SYSTEM_NAME Arduino)
-
-set(CMAKE_C_COMPILER   avr-gcc)
-set(CMAKE_CXX_COMPILER avr-g++)
+set(CMAKE_C_COMPILER   gcc)
+set(CMAKE_CXX_COMPILER g++)
 
 #=============================================================================#
 #                              C Flags                                        
 #=============================================================================#
-set(ARDUINO_C_FLAGS "-mcall-prologues -ffunction-sections -fdata-sections")
+set(ARDUINO_C_FLAGS "-ffunction-sections -fdata-sections")
 set(CMAKE_C_FLAGS                "-g -Os       ${ARDUINO_C_FLAGS}"    CACHE STRING "")
 set(CMAKE_C_FLAGS_DEBUG          "-g           ${ARDUINO_C_FLAGS}"    CACHE STRING "")
 set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG ${ARDUINO_C_FLAGS}"    CACHE STRING "")
@@ -34,7 +32,6 @@ set(CMAKE_EXE_LINKER_FLAGS_RELEASE        "${ARDUINO_LINKER_FLAGS}" CACHE STRING
 set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
 
 #=============================================================================#
-#=============================================================================#
 #                       Shared Lbrary Linker Flags                            #
 #=============================================================================#
 set(CMAKE_SHARED_LINKER_FLAGS                "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
@@ -49,3 +46,7 @@ set(CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL     "${ARDUINO_LINKER_FLAGS}" CACHE STR
 set(CMAKE_MODULE_LINKER_FLAGS_RELEASE        "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
 set(CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO "${ARDUINO_LINKER_FLAGS}" CACHE STRING "")
 
+#=============================================================================#
+#                       Include avrsim
+#=============================================================================#
+set(ARDUINO_TOOLCHAIN_COMPILE_FLAGS "-I ${CMAKE_CURRENT_LIST_DIR}/arduinosim/include -I${CMAKE_CURRENT_LIST_DIR}/arduinosim/support" CACHE STRING "")
