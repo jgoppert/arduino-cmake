@@ -165,7 +165,9 @@ function(GENERATE_ARDUINO_LIBRARY TARGET_NAME)
     set(ALL_LIBS)
     set(ALL_SRCS ${INPUT_SRCS} ${INPUT_HDRS})
 
-    setup_arduino_core(CORE_LIB ${INPUT_BOARD})
+    setup_arduino_core(
+        LIBRARY CORE_LIB
+        BOARD ${INPUT_BOARD})
 
     find_arduino_libraries(TARGET_LIBS "${ALL_SRCS}")
     set(LIB_DEP_INCLUDES)
@@ -174,7 +176,11 @@ function(GENERATE_ARDUINO_LIBRARY TARGET_NAME)
     endforeach()
 
     if(NOT ${INPUT_NO_AUTOLIBS})
-        setup_arduino_libraries(ALL_LIBS  ${INPUT_BOARD} "${ALL_SRCS}" "${LIB_DEP_INCLUDES}" "")
+        setup_arduino_libraries(
+            LIBRARIES ALL_LIBS
+            BOARD ${INPUT_BOARD}
+            SRCS "${ALL_SRCS}"
+            COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
     endif()
 
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
@@ -198,7 +204,9 @@ function(GENERATE_ARDUINO_FIRMWARE)
     set(ALL_LIBS)
     set(ALL_SRCS ${INPUT_SRCS} ${INPUT_HDRS})
 
-    setup_arduino_core(CORE_LIB ${INPUT_BOARD})
+    setup_arduino_core(
+        LIBRARY CORE_LIB
+        BOARD ${INPUT_BOARD})
     
     if(NOT "${INPUT_SKETCH}" STREQUAL "")
         setup_arduino_sketch(${INPUT_SKETCH} ALL_SRCS)
@@ -213,7 +221,11 @@ function(GENERATE_ARDUINO_FIRMWARE)
     endforeach()
 
     if(NOT INPUT_NO_AUTOLIBS)
-        setup_arduino_libraries(ALL_LIBS  ${INPUT_BOARD} "${ALL_SRCS}" "${LIB_DEP_INCLUDES}" "")
+        setup_arduino_libraries(
+            LIBRARIES ALL_LIBS
+            BOARD "${INPUT_BOARD}"
+            SRCS "${ALL_SRCS}"
+            COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
     endif()
     
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
@@ -256,7 +268,9 @@ function(GENERATE_ARDUINO_EXAMPLE)
     set(ALL_LIBS)
     set(ALL_SRCS)
 
-    setup_arduino_core(CORE_LIB "${INPUT_BOARD}")
+    setup_arduino_core(
+        LIBRARY CORE_LIB
+        BOARD "${INPUT_BOARD}")
 
     setup_arduino_example("${INPUT_LIBRARY}" "${INPUT_EXAMPLE}" ALL_SRCS)
 
@@ -345,11 +359,11 @@ function(get_arduino_flags COMPILE_FLAGS_VAR LINK_FLAGS_VAR BOARD_ID)
         endif()
 
         # output
-        set(COMPILE_FLAGS "-DF_CPU=${${BOARD_ID}.build.f_cpu} -DARDUINO=${ARDUINO_VERSION_DEFINE} -I${ARDUINO_CORES_PATH}/${BOARD_CORE} -I${ARDUINO_LIBRARIES_PATH} ${ARDUINO_TOOLCHAIN_COMPILE_FLAGS}")
+        set(COMPILE_FLAGS " ${ARDUINO_TOOLCHAIN_COMPILE_FLAGS} -DARDUINO=${ARDUINO_VERSION_DEFINE} -I${ARDUINO_CORES_PATH}/${BOARD_CORE} -I${ARDUINO_LIBRARIES_PATH}")
         set(LINK_FLAGS "")
 
-        if ("${CMAKE_C_COMPILER}" STREQUAL "avr-gcc")
-            set(COMPILE_FLAGS "${COMPILE_FLAGS} -mmcu=${${BOARD_ID}.build.mcu}")
+        if (NOT ARDUINO_DESKTOP)
+            set(COMPILE_FLAGS "${COMPILE_FLAGS} -DF_CPU=${${BOARD_ID}.build.f_cpu} -mmcu=${${BOARD_ID}.build.mcu}")
             set(LINK_FLAGS "${LINK_FLAGS} -mmcu=${${BOARD_ID}.build.mcu}")
         endif()
 
@@ -372,7 +386,7 @@ endfunction()
 #
 # setup_arduino_core(VAR_NAME BOARD_ID)
 #
-#        VAR_NAME    - Variable name that will hold the generated library name
+#        LIBRARY    -  Variable name that will hold the generated library name
 #        BOARD_ID    - Arduino board id
 #
 # Creates the Arduino Core library for the specified board,
@@ -380,19 +394,27 @@ endfunction()
 #
 #=============================================================================#
 function(setup_arduino_core VAR_NAME BOARD_ID)
-    set(CORE_LIB_NAME ${BOARD_ID}_CORE)
-    set(BOARD_CORE ${${BOARD_ID}.build.core})
+
+    message(STATUS "setup core called!")
+
+    cmake_parse_arguments(INPUT "" "LIBRARY;BOARD" "" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_BOARD MSG "must define for library ${INPUT_LIB_PATH}") 
+
+    set(CORE_LIB_NAME ${INPUT_BOARD}_CORE)
+    set(BOARD_CORE ${${INPUT_BOARD}.build.core})
     if(BOARD_CORE AND NOT TARGET ${CORE_LIB_NAME})
         set(BOARD_CORE_PATH ${ARDUINO_CORES_PATH}/${BOARD_CORE})
-        find_sources(CORE_SRCS ${BOARD_CORE_PATH} True)
-        # Debian/Ubuntu fix
-        list(REMOVE_ITEM CORE_SRCS "${BOARD_CORE_PATH}/main.cxx")
-        add_library(${CORE_LIB_NAME} ${CORE_SRCS})
-        get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS ${BOARD_ID})
-        set_target_properties(${CORE_LIB_NAME} PROPERTIES
+        setup_arduino_library(
+            LIBRARIES ${INPUT_BOARD}_CORE
+            BOARD "${INPUT_BOARD}"
+            LIB_PATH "${BOARD_CORE_PATH}"
             COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS}"
-            LINK_FLAGS "${ARDUINO_LINK_FLAGS}")
-        set(${VAR_NAME} ${CORE_LIB_NAME} PARENT_SCOPE)
+            LINK_FLAGS "{ARDUINO_LINK_FLAGS}"
+            IGNORE_SRCS "${BOARD_CORE_PATH}/main.cxx" # Debian/Ubuntu fix
+            IS_CORE
+            )
+        set(${LIBRARY} ${CORE_LIB_NAME} PARENT_SCOPE)
     endif()
 endfunction()
 
@@ -443,19 +465,23 @@ function(find_arduino_libraries VAR_NAME SRCS)
     if(ARDUINO_LIBS)
         list(REMOVE_DUPLICATES ARDUINO_LIBS)
     endif()
+    if (ARDUINO_DESKTOP)
+        list(APPEND ARDUINO_LIBS Desktop) 
+    endif()
     set(${VAR_NAME} ${ARDUINO_LIBS} PARENT_SCOPE)
 endfunction()
 
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# setup_arduino_library(VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLAGS)
+# setup_arduino_library()
 #
-#        VAR_NAME    - Vairable wich will hold the generated library names
-#        BOARD_ID    - Board name
-#        LIB_PATH    - path of the library
-#        COMPILE_FLAGS    - compile flags
-#        LINK_FLAGS    - link flags
+#        LIBRARIES      - Vairable wich will hold the generated library names
+#        BOARD          - Board name
+#        LIB_PATH       - path of the library
+#        COMPILE_FLAGS  - compile flags
+#        LINK_FLAGS     - link flags
+#        IGNORE_SRCS    - sources to ignore
 #
 # Creates an Arduino library, with all it's library dependencies.
 #
@@ -464,43 +490,78 @@ endfunction()
 #
 #=============================================================================#
 
-# For known libraries can list recurse here
-set(Wire_RECURSE True)
-set(Ethernet_RECURSE True)
-set(SD_RECURSE True)
-function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLAGS)
-    set(LIB_TARGETS)
+function(setup_arduino_library)
 
-    get_filename_component(LIB_NAME ${LIB_PATH} NAME)
-    set(TARGET_LIB_NAME ${BOARD_ID}_${LIB_NAME})
+    cmake_parse_arguments(INPUT "IS_CORE" "LIBRARIES;BOARD;LIB_PATH;COMPILE_FLAGS;LINK_FLAGS"
+        "IGNORE_SRCS" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_LIB_PATH MSG "must define name for library") 
+    required_variables(VARS INPUT_BOARD MSG "must define for library ${INPUT_LIB_PATH}") 
+
+    # For known libraries can list recurse here
+    set(Wire_RECURSE True)
+    set(Ethernet_RECURSE True)
+    set(SD_RECURSE True)
+
+    set(LIB_TARGETS)
+    message(STATUS "lib name: ${INPUT_LIB_PATH}")
+    if (NOT INPUT_IS_CORE)
+        set(LIB_TARGETS "${INPUT_BOARD}_CORE")
+    endif()
+
+    get_filename_component(LIB_NAME ${INPUT_LIB_PATH} NAME)
+    set(TARGET_LIB_NAME ${INPUT_BOARD}_${LIB_NAME})
     if(NOT TARGET ${TARGET_LIB_NAME})
-        string(REGEX REPLACE ".*/" "" LIB_SHORT_NAME ${LIB_NAME})
+
+        if (INPUT_IS_CORE)
+            set(LIB_SHORT_NAME "${INPUT_BOARD}_CORE")
+        else()
+            string(REGEX REPLACE ".*/" "" LIB_SHORT_NAME ${LIB_NAME})
+        endif()
+
 
         # Detect if recursion is needed
         if (NOT DEFINED ${LIB_SHORT_NAME}_RECURSE)
             set(${LIB_SHORT_NAME}_RECURSE False)
         endif()
 
-        find_sources(LIB_SRCS ${LIB_PATH} ${${LIB_SHORT_NAME}_RECURSE})
+        if (${${LIB_SHORT_NAME}_RECURSE})
+            set(LIB_RECURSE "RECURSE")
+        else()
+            set(LIB_RECURSE "")
+        endif()
+
+        find_sources(
+            SRCS LIB_SRCS
+            PATH "${INPUT_LIB_PATH}"
+            IGNORE "${INPUT_IGNORE_SRCS}"
+            ${LIB_RECURSE})
+
         if(LIB_SRCS)
 
-            arduino_debug_msg("Generating Arduino ${LIB_NAME} library")
+            arduino_debug_msg("Generating ${LIB_SHORT_NAME} library")
+
             add_library(${TARGET_LIB_NAME} STATIC ${LIB_SRCS})
 
-            get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS ${BOARD_ID})
+            get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS ${INPUT_BOARD})
 
             find_arduino_libraries(LIB_DEPS "${LIB_SRCS}")
 
             foreach(LIB_DEP ${LIB_DEPS})
-                setup_arduino_library(DEP_LIB_SRCS ${BOARD_ID} ${LIB_DEP} "${COMPILE_FLAGS}" "${LINK_FLAGS}")
+                setup_arduino_library(
+                    LIBRARIES DEP_LIB_SRCS
+                    BOARD ${INPUT_BOARD}
+                    LIB_PATH ${LIB_DEP}
+                    COMPILE_FLAGS "${INPUT_COMPILE_FLAGS}"
+                    LINK_FLAGS "${INPUT_LINK_FLAGS}")
                 list(APPEND LIB_TARGETS ${DEP_LIB_SRCS})
             endforeach()
 
             set_target_properties(${TARGET_LIB_NAME} PROPERTIES
-                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} -I${LIB_PATH} -I${LIB_PATH}/utility ${COMPILE_FLAGS}"
-                LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${LINK_FLAGS}")
+                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} -I${INPUT_LIB_PATH} -I${INPUT_LIB_PATH}/utility ${INPUT_COMPILE_FLAGS}"
+                LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${INPUT_LINK_FLAGS}")
 
-            target_link_libraries(${TARGET_LIB_NAME} ${BOARD_ID}_CORE ${LIB_TARGETS})
+            target_link_libraries(${TARGET_LIB_NAME} ${LIB_TARGETS})
             list(APPEND LIB_TARGETS ${TARGET_LIB_NAME})
 
         endif()
@@ -511,32 +572,42 @@ function(setup_arduino_library VAR_NAME BOARD_ID LIB_PATH COMPILE_FLAGS LINK_FLA
     if(LIB_TARGETS)
         list(REMOVE_DUPLICATES LIB_TARGETS)
     endif()
-    set(${VAR_NAME} ${LIB_TARGETS} PARENT_SCOPE)
+    set(${INPUT_LIBRARIES} ${LIB_TARGETS} PARENT_SCOPE)
 endfunction()
 
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# setup_arduino_libraries(VAR_NAME BOARD_ID SRCS COMPILE_FLAGS LINK_FLAGS)
+# setup_arduino_libraries()
 #
-#        VAR_NAME    - Vairable wich will hold the generated library names
-#        BOARD_ID    - Board ID
-#        SRCS        - source files
-#        COMPILE_FLAGS    - Compile flags
-#        LINK_FLAGS    - Linker flags
+#        LIBRARIES      - Vairable wich will hold the generated library names
+#        BOARD          - Board ID
+#        SRCS           - source files
+#        COMPILE_FLAGS  - Compile flags
+#        LINK_FLAGS     - Linker flags
 #
 # Finds and creates all dependency libraries based on sources.
 #
 #=============================================================================#
-function(setup_arduino_libraries VAR_NAME BOARD_ID SRCS COMPILE_FLAGS LINK_FLAGS)
+function(setup_arduino_libraries)
+
+    cmake_parse_arguments(INPUT "" "LIBRARIES;BOARD;SRCS;COMPILE_FLAGS;LINK_FLAGS" "" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_BOARD INPUT_SRCS MSG "must define") 
+
     set(LIB_TARGETS)
-    find_arduino_libraries(TARGET_LIBS "${SRCS}")
+    find_arduino_libraries(TARGET_LIBS "${INPUT_SRCS}")
     foreach(TARGET_LIB ${TARGET_LIBS})
         # Create static library instead of returning sources
-        setup_arduino_library(LIB_DEPS ${BOARD_ID} ${TARGET_LIB} "${COMPILE_FLAGS}" "${LINK_FLAGS}")
+        setup_arduino_library(
+            LIBRARIES LIB_DEPS
+            BOARD ${INPUT_BOARD}
+            LIB_PATH ${TARGET_LIB}
+            COMPILE_FLAGS "${INPUT_COMPILE_FLAGS}"
+            LINK_FLAGS "${INPUT_LINK_FLAGS}")
         list(APPEND LIB_TARGETS ${LIB_DEPS})
     endforeach()
-    set(${VAR_NAME} ${LIB_TARGETS} PARENT_SCOPE)
+    set(${INPUT_LIBRARIES} ${LIB_TARGETS} PARENT_SCOPE)
 endfunction()
 
 
@@ -864,33 +935,41 @@ endfunction()
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# find_sources(VAR_NAME LIB_PATH RECURSE)
+# find_sources()
 #
-#        VAR_NAME - Variable name that will hold the detected sources
-#        LIB_PATH - The base path
-#        RECURSE  - Whether or not to recurse
+#        SRCS       - Variable name that will hold the detected sources
+#        PATH       - The base path
+#        IGNORE     - Files to ignore
+#        RECURSE    - Whether or not to recurse
 #
 # Finds all C/C++ sources located at the specified path.
 #
 #=============================================================================#
-function(find_sources VAR_NAME LIB_PATH RECURSE)
-    set(FILE_SEARCH_LIST
-        ${LIB_PATH}/*.cpp
-        ${LIB_PATH}/*.c
-        ${LIB_PATH}/*.cc
-        ${LIB_PATH}/*.cxx
-        ${LIB_PATH}/*.h
-        ${LIB_PATH}/*.hh
-        ${LIB_PATH}/*.hxx)
+function(find_sources)
 
-    if(RECURSE)
+    cmake_parse_arguments(INPUT "RECURSE" "SRCS;PATH" "IGNORE" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_PATH MSG "must define search path")
+
+    set(FILE_SEARCH_LIST
+        ${INPUT_PATH}/*.cpp
+        ${INPUT_PATH}/*.c
+        ${INPUT_PATH}/*.cc
+        ${INPUT_PATH}/*.cxx
+        ${INPUT_PATH}/*.h
+        ${INPUT_PATH}/*.hh
+        ${INPUT_PATH}/*.hxx)
+
+    if( ${INPUT_RECURSE} )
+        message(STATUS "RECURSING")
         file(GLOB_RECURSE LIB_FILES ${FILE_SEARCH_LIST})
     else()
+        message(STATUS "NOT RECURSING")
         file(GLOB LIB_FILES ${FILE_SEARCH_LIST})
     endif()
 
     if(LIB_FILES)
-        set(${VAR_NAME} ${LIB_FILES} PARENT_SCOPE)
+        set(${INPUT_SRCS} ${LIB_FILES} PARENT_SCOPE)
     endif()
 endfunction()
 
