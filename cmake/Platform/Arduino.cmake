@@ -207,7 +207,7 @@ function(GENERATE_ARDUINO_FIRMWARE)
     setup_arduino_core(
         LIBRARY CORE_LIB
         BOARD ${INPUT_BOARD})
-    
+
     if(NOT "${INPUT_SKETCH}" STREQUAL "")
         setup_arduino_sketch(${INPUT_SKETCH} ALL_SRCS)
     endif()
@@ -284,7 +284,11 @@ function(GENERATE_ARDUINO_EXAMPLE)
         set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
     endforeach()
 
-    setup_arduino_libraries(ALL_LIBS "${INPUT_BOARD}" "${ALL_SRCS}" "${LIB_DEP_INCLUDES}" "")
+    setup_arduino_libraries(
+            LIBRARIES ALL_LIBS
+            BOARD "${INPUT_BOARD}"
+            SRCS "${ALL_SRCS}"
+            COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
 
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
     
@@ -384,7 +388,7 @@ endfunction()
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# setup_arduino_core(VAR_NAME BOARD_ID)
+# setup_arduino_core()
 #
 #        LIBRARY    -  Variable name that will hold the generated library name
 #        BOARD_ID    - Arduino board id
@@ -393,9 +397,7 @@ endfunction()
 # each board gets it's own version of the library.
 #
 #=============================================================================#
-function(setup_arduino_core VAR_NAME BOARD_ID)
-
-    message(STATUS "setup core called!")
+function(setup_arduino_core)
 
     cmake_parse_arguments(INPUT "" "LIBRARY;BOARD" "" ${ARGN})
     error_for_unparsed(INPUT)
@@ -406,16 +408,17 @@ function(setup_arduino_core VAR_NAME BOARD_ID)
     if(BOARD_CORE AND NOT TARGET ${CORE_LIB_NAME})
         set(BOARD_CORE_PATH ${ARDUINO_CORES_PATH}/${BOARD_CORE})
         setup_arduino_library(
-            LIBRARIES ${INPUT_BOARD}_CORE
+            LIBRARIES CORE_LIB_NAME 
             BOARD "${INPUT_BOARD}"
             LIB_PATH "${BOARD_CORE_PATH}"
             COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS}"
-            LINK_FLAGS "{ARDUINO_LINK_FLAGS}"
+            LINK_FLAGS "${ARDUINO_LINK_FLAGS}"
             IGNORE_SRCS "${BOARD_CORE_PATH}/main.cxx" # Debian/Ubuntu fix
             IS_CORE
             )
-        set(${LIBRARY} ${CORE_LIB_NAME} PARENT_SCOPE)
+        set(${INPUT_LIBRARY} ${CORE_LIB_NAME} PARENT_SCOPE)
     endif()
+
 endfunction()
 
 #=============================================================================#
@@ -492,8 +495,8 @@ endfunction()
 
 function(setup_arduino_library)
 
-    cmake_parse_arguments(INPUT "IS_CORE" "LIBRARIES;BOARD;LIB_PATH;COMPILE_FLAGS;LINK_FLAGS"
-        "IGNORE_SRCS" ${ARGN})
+    cmake_parse_arguments(INPUT "IS_CORE" "LIBRARIES;BOARD;LIB_PATH"
+        "COMPILE_FLAGS;LINK_FLAGS;IGNORE_SRCS" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_LIB_PATH MSG "must define name for library") 
     required_variables(VARS INPUT_BOARD MSG "must define for library ${INPUT_LIB_PATH}") 
@@ -504,28 +507,28 @@ function(setup_arduino_library)
     set(SD_RECURSE True)
 
     set(LIB_TARGETS)
-    message(STATUS "lib name: ${INPUT_LIB_PATH}")
+
     if (NOT INPUT_IS_CORE)
         set(LIB_TARGETS "${INPUT_BOARD}_CORE")
     endif()
 
     get_filename_component(LIB_NAME ${INPUT_LIB_PATH} NAME)
-    set(TARGET_LIB_NAME ${INPUT_BOARD}_${LIB_NAME})
+    string(REGEX REPLACE ".*/" "" LIB_NAME ${LIB_NAME})
+
+    if (INPUT_IS_CORE)
+        set(TARGET_LIB_NAME "${INPUT_BOARD}_CORE")
+    else()
+        set(TARGET_LIB_NAME "${INPUT_BOARD}_${LIB_NAME}")
+    endif()
+
     if(NOT TARGET ${TARGET_LIB_NAME})
 
-        if (INPUT_IS_CORE)
-            set(LIB_SHORT_NAME "${INPUT_BOARD}_CORE")
-        else()
-            string(REGEX REPLACE ".*/" "" LIB_SHORT_NAME ${LIB_NAME})
-        endif()
-
-
         # Detect if recursion is needed
-        if (NOT DEFINED ${LIB_SHORT_NAME}_RECURSE)
-            set(${LIB_SHORT_NAME}_RECURSE False)
+        if (NOT DEFINED ${LIB_NAME}_RECURSE)
+            set(${LIB_NAME}_RECURSE False)
         endif()
 
-        if (${${LIB_SHORT_NAME}_RECURSE})
+        if (${${LIB_NAME}_RECURSE})
             set(LIB_RECURSE "RECURSE")
         else()
             set(LIB_RECURSE "")
@@ -539,7 +542,7 @@ function(setup_arduino_library)
 
         if(LIB_SRCS)
 
-            arduino_debug_msg("Generating ${LIB_SHORT_NAME} library")
+            arduino_debug_msg("Generating ${TARGET_LIB_NAME} library")
 
             add_library(${TARGET_LIB_NAME} STATIC ${LIB_SRCS})
 
@@ -591,7 +594,7 @@ endfunction()
 #=============================================================================#
 function(setup_arduino_libraries)
 
-    cmake_parse_arguments(INPUT "" "LIBRARIES;BOARD;SRCS;COMPILE_FLAGS;LINK_FLAGS" "" ${ARGN})
+    cmake_parse_arguments(INPUT "" "LIBRARIES;BOARD" "SRCS;COMPILE_FLAGS;LINK_FLAGS" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_BOARD INPUT_SRCS MSG "must define") 
 
@@ -961,10 +964,8 @@ function(find_sources)
         ${INPUT_PATH}/*.hxx)
 
     if( ${INPUT_RECURSE} )
-        message(STATUS "RECURSING")
         file(GLOB_RECURSE LIB_FILES ${FILE_SEARCH_LIST})
     else()
-        message(STATUS "NOT RECURSING")
         file(GLOB LIB_FILES ${FILE_SEARCH_LIST})
     endif()
 
@@ -1642,4 +1643,3 @@ if(NOT ARDUINO_FOUND)
         ARDUINO_OBJCOPY_HEX_FLAGS
         AVRSIZE_PROGRAM)
 endif()
-
