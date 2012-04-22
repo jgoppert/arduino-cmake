@@ -206,13 +206,15 @@ function(GENERATE_ARDUINO_FIRMWARE)
 
     set(ALL_LIBS)
     set(ALL_SRCS ${INPUT_SRCS} ${INPUT_HDRS})
-    if (ARDUINO_DESKTOP)
-        list(APPEND ALL_SRCS ${INPUT_DESKTOP_SRCS}) 
-    endif()
 
     setup_arduino_core(
         LIBRARY CORE_LIB
         BOARD ${INPUT_BOARD})
+
+
+    if (ARDUINO_DESKTOP)
+        list(APPEND ALL_SRCS ${INPUT_DESKTOP_SRCS}) 
+    endif()
 
     if(NOT "${INPUT_SKETCH}" STREQUAL "")
         setup_arduino_sketch(
@@ -234,10 +236,6 @@ function(GENERATE_ARDUINO_FIRMWARE)
 
     if (ARDUINO_DESKTOP)
         set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} ${INPUT_DESKTOP_COMPILE_FLAGS}") 
-    endif()
-
-    if (ARDUINO_DESKTOP)
-        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} -I${CMAKE_SOURCE_DIR}/libraries/Desktop/include")
     endif()
 
     if(NOT INPUT_NO_AUTOLIBS)
