@@ -149,11 +149,11 @@ endfunction()
 #=============================================================================#
 # [PUBLIC/USER]
 #
-# generate_arduino_library(TARGET_NAME)
+# generate_arduino_library()
 #
 # see documentation at top
 #=============================================================================#
-function(GENERATE_ARDUINO_LIBRARY TARGET_NAME)
+function(GENERATE_ARDUINO_LIBRARY)
 
     cmake_parse_arguments(INPUT "NO_AUTOLIBS" "NAME;BOARD" "SRCS;HDRS;LIBS" ${ARGN})
     error_for_unparsed(INPUT)
@@ -170,13 +170,15 @@ function(GENERATE_ARDUINO_LIBRARY TARGET_NAME)
         LIBRARY CORE_LIB
         BOARD ${INPUT_BOARD})
 
-    find_arduino_libraries(TARGET_LIBS "${ALL_SRCS}")
+    find_arduino_libraries(
+        LIBS TARGET_LIBS
+        SRCS "${ALL_SRCS}")
     set(LIB_DEP_INCLUDES)
     foreach(LIB_DEP ${TARGET_LIBS})
         set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
     endforeach()
 
-    if(NOT ${INPUT_NO_AUTOLIBS})
+    if(NOT INPUT_NO_AUTOLIBS)
         setup_arduino_libraries(
             LIBRARIES ALL_LIBS
             BOARD ${INPUT_BOARD}
@@ -213,12 +215,14 @@ function(GENERATE_ARDUINO_FIRMWARE)
         setup_arduino_sketch(
             SKETCH "${INPUT_SKETCH}"
             SRCS ALL_SRCS
-            DESKTOP_IGNORE "${DESKTOP_IGNORE}")
+            DESKTOP_IGNORE "${INPUT_DESKTOP_IGNORE}")
     endif()
 
     required_variables(VARS ALL_SRCS MSG "must define SRCS or SKETCH for target ${INPUT_FIRMWARE}")
 
-    find_arduino_libraries(TARGET_LIBS "${ALL_SRCS}")
+    find_arduino_libraries(
+        LIBS TARGET_LIBS
+        SRCS "${ALL_SRCS}")
 
     set(LIB_DEP_INCLUDES)
     foreach(LIB_DEP ${TARGET_LIBS})
@@ -287,7 +291,10 @@ function(GENERATE_ARDUINO_EXAMPLE)
         message(FATAL_ERROR "Missing sources for example, aborting!")
     endif()
 
-    find_arduino_libraries(TARGET_LIBS "${ALL_SRCS}")
+    find_arduino_libraries(
+        LIBS TARGET_LIBS
+        SRCS "${ALL_SRCS}")
+
     set(LIB_DEP_INCLUDES)
     foreach(LIB_DEP ${TARGET_LIBS})
         set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
@@ -376,7 +383,7 @@ function(get_arduino_flags COMPILE_FLAGS_VAR LINK_FLAGS_VAR BOARD_ID)
         set(LINK_FLAGS "")
 
         if (NOT ARDUINO_DESKTOP)
-            set(COMPILE_FLAGS "${COMPILE_FLAGS}-mmcu=${${BOARD_ID}.build.mcu} -DF_CPU=${${BOARD_ID}.build.f_cpu}")
+            set(COMPILE_FLAGS "${COMPILE_FLAGS} -mmcu=${${BOARD_ID}.build.mcu} -DF_CPU=${${BOARD_ID}.build.f_cpu}")
             set(LINK_FLAGS "${LINK_FLAGS} -mmcu=${${BOARD_ID}.build.mcu}")
         endif()
 
@@ -435,10 +442,10 @@ endfunction()
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# find_arduino_libraries(VAR_NAME SRCS)
+# find_arduino_libraries()
 #
-#      VAR_NAME - Variable name which will hold the results
-#      SRCS     - Sources that will be analized
+#      LIBS         - Variable name which will hold the results
+#      SRCS         - Sources that will be analyzed
 #
 #     returns a list of paths to libraries found.
 #
@@ -457,9 +464,17 @@ endfunction()
 #  to be part of that Arduino library.
 #
 #=============================================================================#
-function(find_arduino_libraries VAR_NAME SRCS)
+function(find_arduino_libraries)
+
+    cmake_parse_arguments(INPUT "" "LIBS" "SRCS" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_LIBS INPUT_SRCS MSG "must define") 
 
     set(ARDUINO_LIBS )
+
+    get_property(LIBRARY_SEARCH_PATH
+        DIRECTORY     # Property Scope
+        PROPERTY LINK_DIRECTORIES)
 
     set(LIB_SEARCH_PATHS
         ${LIBRARY_SEARCH_PATH}
@@ -468,21 +483,24 @@ function(find_arduino_libraries VAR_NAME SRCS)
         ${CMAKE_SOURCE_DIR}/libraries
         ${ARDUINO_EXTRA_LIBRARIES_PATH})
 
-    foreach(SRC ${SRCS})
-        file(STRINGS ${SRC} SRC_CONTENTS)
-        foreach(SRC_LINE ${SRC_CONTENTS})
-            if("${SRC_LINE}" MATCHES "^ *#include *[<\"](.*)[>\"]")
-                get_filename_component(INCLUDE_NAME ${CMAKE_MATCH_1} NAME_WE)
-                get_property(LIBRARY_SEARCH_PATH
-                             DIRECTORY     # Property Scope
-                             PROPERTY LINK_DIRECTORIES)
-                foreach(LIB_SEARCH_PATH ${LIB_SEARCH_PATHS})
-                    if(EXISTS ${LIB_SEARCH_PATH}/${INCLUDE_NAME}/${CMAKE_MATCH_1})
-                        list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${INCLUDE_NAME})
-                        break()
-                    endif()
-                endforeach()
-            endif()
+    set(INCLUDE_REGEX "[#]include *[<\"]([^\n]+)[>\"]")
+
+    foreach(SRC ${INPUT_SRCS})
+        #message(STATUS "src: ${SRC}")
+        file(READ "${SRC}" SRC_CONTENTS)
+        string(REGEX MATCHALL "${INCLUDE_REGEX}" INCLUDE_STRINGS "${SRC_CONTENTS}")
+        foreach(INCLUDE_STRING ${INCLUDE_STRINGS})
+            string(REGEX REPLACE "${INCLUDE_REGEX}" "\\1" INCLUDE_FILE "${INCLUDE_STRING}")
+            get_filename_component(INCLUDE_NAME "${INCLUDE_FILE}" NAME_WE)
+            message(STATUS "include string: ${INCLUDE_STRING}")
+            #message(STATUS "include file: ${INCLUDE_FILE}")
+            #message(STATUS "include name: ${INCLUDE_NAME}")
+            foreach(LIB_SEARCH_PATH ${LIB_SEARCH_PATHS})
+                if(EXISTS ${LIB_SEARCH_PATH}/${INCLUDE_NAME}/${INCLUDE_FILE})
+                    list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${INCLUDE_NAME})
+                    break()
+                endif()
+            endforeach()
         endforeach()
     endforeach()
 
@@ -490,8 +508,7 @@ function(find_arduino_libraries VAR_NAME SRCS)
         list(REMOVE_DUPLICATES ARDUINO_LIBS)
     endif()
 
-    #message(STATUS "ARDUINO LIBS:\n${ARDUINO_LIBS}")
-    set(${VAR_NAME} ${ARDUINO_LIBS} PARENT_SCOPE)
+    set(${INPUT_LIBS} ${ARDUINO_LIBS} PARENT_SCOPE)
 
 endfunction()
 
@@ -506,6 +523,7 @@ endfunction()
 #        COMPILE_FLAGS  - compile flags
 #        LINK_FLAGS     - link flags
 #        IGNORE_SRCS    - sources to ignore
+#        IS_CORE        - is this the core library
 #
 # Creates an Arduino library, with all it's library dependencies.
 #
@@ -535,7 +553,6 @@ function(setup_arduino_library)
     endif()
 
     get_filename_component(LIB_NAME ${INPUT_LIB_PATH} NAME)
-    string(REGEX REPLACE ".*/" "" LIB_NAME ${LIB_NAME})
 
     if (INPUT_IS_CORE)
         set(TARGET_LIB_NAME "${INPUT_BOARD}_CORE")
@@ -544,8 +561,6 @@ function(setup_arduino_library)
     endif()
 
     if(NOT TARGET ${TARGET_LIB_NAME})
-
-        message(STATUS "LIBRARY ${TARGET_LIB_NAME}")
 
         # Detect if recursion is needed
         if (NOT DEFINED ${LIB_NAME}_RECURSE)
@@ -572,7 +587,9 @@ function(setup_arduino_library)
 
             get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS ${INPUT_BOARD})
 
-            find_arduino_libraries(LIB_DEPS "${LIB_SRCS}")
+            find_arduino_libraries(
+                LIBS LIB_DEPS
+                SRCS "${LIB_SRCS}")
 
             foreach(LIB_DEP ${LIB_DEPS})
                 setup_arduino_library(
@@ -623,7 +640,9 @@ function(setup_arduino_libraries)
     required_variables(VARS INPUT_BOARD INPUT_SRCS MSG "must define") 
 
     set(LIB_TARGETS)
-    find_arduino_libraries(TARGET_LIBS "${INPUT_SRCS}")
+    find_arduino_libraries(
+        LIBS TARGET_LIBS
+        SRCS "${INPUT_SRCS}")
     foreach(TARGET_LIB ${TARGET_LIBS})
         # Create static library instead of returning sources
         setup_arduino_library(
@@ -634,6 +653,7 @@ function(setup_arduino_libraries)
             LINK_FLAGS "${INPUT_LINK_FLAGS}")
         list(APPEND LIB_TARGETS ${LIB_DEPS})
     endforeach()
+
     set(${INPUT_LIBRARIES} ${LIB_TARGETS} PARENT_SCOPE)
 endfunction()
 
@@ -641,7 +661,7 @@ endfunction()
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# setup_arduino_target(TARGET_NAME ALL_SRCS ALL_LIBS COMPILE_FLAGS LINK_FLAGS)
+# setup_arduino_target()
 #
 #        TARGET_NAME - Target name
 #        BOARD - The arduino board
@@ -1271,8 +1291,12 @@ function(SETUP_ARDUINO_SKETCH)
             list(REMOVE_ITEM SKETCH_SOURCES ${MAIN_SKETCH} ${INPUT_DESKTOP_IGNORE})
         endif()
 
+        #foreach(SKETCH_SOURCE ${SKETCH_SOURCES})
+            #message(STATUS "${SKETCH_SOURCE}")
+        #endforeach()
+
         list(SORT SKETCH_SOURCES)
-        
+
         generate_cpp_from_sketch("${MAIN_SKETCH}" "${SKETCH_SOURCES}" "${SKETCH_CPP}")
 
         # Regenerate build system if sketch changes

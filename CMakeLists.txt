@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 2.8)
 project(ArduinoExample C CXX)
 
 option(TEST "Enable testing" ON)
-option(DEBUG "Enable debug" OFF)
+option(DEBUG "Enable debug" ON)
 
 # modify flags from default toolchain flags
 set(APM_OPT_FLAGS "-Wformat -Wall -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wformat=2")
@@ -31,12 +31,12 @@ if (DEBUG)
 endif()
 
 # projects
-#generate_arduino_firmware(
-    #FIRMWARE Blink
-    #SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
-    #BOARD mega2560
-    #PORT /dev/ttyUSB0
-    #NO_AUTOLIBS)
+generate_arduino_firmware(
+    FIRMWARE Blink
+    SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
+    BOARD mega2560
+    PORT /dev/ttyUSB0
+    NO_AUTOLIBS)
 
 #generate_arduino_example(
     #EXAMPLE SoftwareSerialExample
@@ -51,17 +51,18 @@ if (TEST)
         #BOARD mega
         #PORT /dev/ttyUSB0)
 
-    generate_arduino_firmware(
-        FIRMWARE ArduPlane
-        SKETCH ${CMAKE_SOURCE_DIR}/test/ArduPlane
-        BOARD mega2560
-        DESKTOP_IGNORE
-            I2C/I2C.cpp
-            DataFlash/DataFlash_APM1.cpp
-            FastSerial/FastSerial.cpp
-            AP_Compass/AP_Compass_HMC5843.cpp
-            AP_Baro/AP_Baro_BMP085.cpp
-        PORT /dev/ttyUSB0)
+    #generate_arduino_firmware(
+        #FIRMWARE ArduPlane
+        #SKETCH ${CMAKE_SOURCE_DIR}/test/ArduPlane
+        #BOARD mega2560
+        #DESKTOP_IGNORE
+            #I2C/I2C.cpp
+            #DataFlash/DataFlash_APM1.cpp
+            #FastSerial/FastSerial.cpp
+            #FastSerial/vprintf.cpp
+            #AP_Compass/AP_Compass_HMC5843.cpp
+            #AP_Baro/AP_Baro_BMP085.cpp
+        #PORT /dev/ttyUSB0)
 
     #generate_arduino_firmware(
         #FIRMWARE ArduCopter
