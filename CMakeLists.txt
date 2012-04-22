@@ -31,36 +31,42 @@ if (DEBUG)
 endif()
 
 # projects
-generate_arduino_firmware(
-    FIRMWARE Blink
-    SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
-    BOARD mega2560
-    PORT /dev/ttyUSB0
-    NO_AUTOLIBS)
+#generate_arduino_firmware(
+    #FIRMWARE Blink
+    #SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
+    #BOARD mega2560
+    #PORT /dev/ttyUSB0
+    #NO_AUTOLIBS)
 
-generate_arduino_example(
-    EXAMPLE SoftwareSerialExample
-    BOARD mega2560
-    LIBRARY SoftwareSerial
-    PORT /dev/ttyUSB0)
+#generate_arduino_example(
+    #EXAMPLE SoftwareSerialExample
+    #BOARD mega2560
+    #LIBRARY SoftwareSerial
+    #PORT /dev/ttyUSB0)
 
 if (TEST)
-    generate_arduino_firmware(
-        FIRMWARE Blink2
-        SKETCH ${CMAKE_SOURCE_DIR}/test/Blink2
-        BOARD mega
-        PORT /dev/ttyUSB0)
+    #generate_arduino_firmware(
+        #FIRMWARE Blink2
+        #SKETCH ${CMAKE_SOURCE_DIR}/test/Blink2
+        #BOARD mega
+        #PORT /dev/ttyUSB0)
 
     generate_arduino_firmware(
         FIRMWARE ArduPlane
         SKETCH ${CMAKE_SOURCE_DIR}/test/ArduPlane
         BOARD mega2560
+        DESKTOP_IGNORE
+            I2C/I2C.cpp
+            DataFlash/DataFlash_APM1.cpp
+            FastSerial/FastSerial.cpp
+            AP_Compass/AP_Compass_HMC5843.cpp
+            AP_Baro/AP_Baro_BMP085.cpp
         PORT /dev/ttyUSB0)
 
-    generate_arduino_firmware(
-        FIRMWARE ArduCopter
-        SKETCH ${CMAKE_SOURCE_DIR}/test/ArduCopter
-        BOARD mega
-        PORT /dev/ttyUSB0)
+    #generate_arduino_firmware(
+        #FIRMWARE ArduCopter
+        #SKETCH ${CMAKE_SOURCE_DIR}/test/ArduCopter
+        #BOARD mega
+        #PORT /dev/ttyUSB0)
 
 endif()

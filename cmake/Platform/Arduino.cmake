@@ -15,6 +15,7 @@
 #      AFLAGS         # Override global Avrdude flags for target
 #      SERIAL         # Serial command for serial target
 #      NO_AUTOLIBS    # Disables Arduino library detection
+#      DESKTOP_IGNORE # Sources to ignore for Desktop build
 #
 # Here is a short example for a target named test:
 #    
@@ -195,7 +196,7 @@ endfunction()
 #=============================================================================#
 function(GENERATE_ARDUINO_FIRMWARE)
 
-    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;HDRS;LIBS;AFLAGS" ${ARGN})
+    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_FIRMWARE MSG "must define name for target")
     message(STATUS "Generating ${INPUT_FIRMWARE}")
@@ -209,16 +210,24 @@ function(GENERATE_ARDUINO_FIRMWARE)
         BOARD ${INPUT_BOARD})
 
     if(NOT "${INPUT_SKETCH}" STREQUAL "")
-        setup_arduino_sketch(${INPUT_SKETCH} ALL_SRCS)
+        setup_arduino_sketch(
+            SKETCH "${INPUT_SKETCH}"
+            SRCS ALL_SRCS
+            DESKTOP_IGNORE "${DESKTOP_IGNORE}")
     endif()
 
     required_variables(VARS ALL_SRCS MSG "must define SRCS or SKETCH for target ${INPUT_FIRMWARE}")
 
     find_arduino_libraries(TARGET_LIBS "${ALL_SRCS}")
+
     set(LIB_DEP_INCLUDES)
     foreach(LIB_DEP ${TARGET_LIBS})
         set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
     endforeach()
+
+    if (ARDUINO_DESKTOP)
+        set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${CMAKE_SOURCE_DIR}/libraries/Desktop/include")
+    endif()
 
     if(NOT INPUT_NO_AUTOLIBS)
         setup_arduino_libraries(
@@ -367,7 +376,7 @@ function(get_arduino_flags COMPILE_FLAGS_VAR LINK_FLAGS_VAR BOARD_ID)
         set(LINK_FLAGS "")
 
         if (NOT ARDUINO_DESKTOP)
-            set(COMPILE_FLAGS "${COMPILE_FLAGS} -DF_CPU=${${BOARD_ID}.build.f_cpu} -mmcu=${${BOARD_ID}.build.mcu}")
+            set(COMPILE_FLAGS "${COMPILE_FLAGS}-mmcu=${${BOARD_ID}.build.mcu} -DF_CPU=${${BOARD_ID}.build.f_cpu}")
             set(LINK_FLAGS "${LINK_FLAGS} -mmcu=${${BOARD_ID}.build.mcu}")
         endif()
 
@@ -407,16 +416,18 @@ function(setup_arduino_core)
     set(BOARD_CORE ${${INPUT_BOARD}.build.core})
     if(BOARD_CORE AND NOT TARGET ${CORE_LIB_NAME})
         set(BOARD_CORE_PATH ${ARDUINO_CORES_PATH}/${BOARD_CORE})
-        setup_arduino_library(
-            LIBRARIES CORE_LIB_NAME 
-            BOARD "${INPUT_BOARD}"
-            LIB_PATH "${BOARD_CORE_PATH}"
-            COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS}"
-            LINK_FLAGS "${ARDUINO_LINK_FLAGS}"
-            IGNORE_SRCS "${BOARD_CORE_PATH}/main.cxx" # Debian/Ubuntu fix
-            IS_CORE
-            )
-        set(${INPUT_LIBRARY} ${CORE_LIB_NAME} PARENT_SCOPE)
+        if (NOT ARDUINO_DESKTOP)
+            setup_arduino_library(
+                LIBRARIES CORE_LIB_NAME 
+                BOARD "${INPUT_BOARD}"
+                LIB_PATH "${BOARD_CORE_PATH}"
+                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS}"
+                LINK_FLAGS "${ARDUINO_LINK_FLAGS}"
+                IGNORE_SRCS "${BOARD_CORE_PATH}/main.cxx" # Debian/Ubuntu fix
+                IS_CORE
+                )
+            set(${INPUT_LIBRARY} ${CORE_LIB_NAME} PARENT_SCOPE)
+        endif()
     endif()
 
 endfunction()
@@ -447,7 +458,16 @@ endfunction()
 #
 #=============================================================================#
 function(find_arduino_libraries VAR_NAME SRCS)
+
     set(ARDUINO_LIBS )
+
+    set(LIB_SEARCH_PATHS
+        ${LIBRARY_SEARCH_PATH}
+        ${ARDUINO_LIBRARIES_PATH}
+        ${CMAKE_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/libraries
+        ${ARDUINO_EXTRA_LIBRARIES_PATH})
+
     foreach(SRC ${SRCS})
         file(STRINGS ${SRC} SRC_CONTENTS)
         foreach(SRC_LINE ${SRC_CONTENTS})
@@ -456,7 +476,7 @@ function(find_arduino_libraries VAR_NAME SRCS)
                 get_property(LIBRARY_SEARCH_PATH
                              DIRECTORY     # Property Scope
                              PROPERTY LINK_DIRECTORIES)
-                foreach(LIB_SEARCH_PATH ${LIBRARY_SEARCH_PATH} ${ARDUINO_LIBRARIES_PATH} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libraries ${ARDUINO_EXTRA_LIBRARIES_PATH})
+                foreach(LIB_SEARCH_PATH ${LIB_SEARCH_PATHS})
                     if(EXISTS ${LIB_SEARCH_PATH}/${INCLUDE_NAME}/${CMAKE_MATCH_1})
                         list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${INCLUDE_NAME})
                         break()
@@ -465,13 +485,14 @@ function(find_arduino_libraries VAR_NAME SRCS)
             endif()
         endforeach()
     endforeach()
+
     if(ARDUINO_LIBS)
         list(REMOVE_DUPLICATES ARDUINO_LIBS)
     endif()
-    if (ARDUINO_DESKTOP)
-        list(APPEND ARDUINO_LIBS Desktop) 
-    endif()
+
+    #message(STATUS "ARDUINO LIBS:\n${ARDUINO_LIBS}")
     set(${VAR_NAME} ${ARDUINO_LIBS} PARENT_SCOPE)
+
 endfunction()
 
 #=============================================================================#
@@ -505,10 +526,11 @@ function(setup_arduino_library)
     set(Wire_RECURSE True)
     set(Ethernet_RECURSE True)
     set(SD_RECURSE True)
+    set(Desktop True)
 
     set(LIB_TARGETS)
 
-    if (NOT INPUT_IS_CORE)
+    if (NOT INPUT_IS_CORE AND NOT ARDUINO_DESKTOP)
         set(LIB_TARGETS "${INPUT_BOARD}_CORE")
     endif()
 
@@ -522,6 +544,8 @@ function(setup_arduino_library)
     endif()
 
     if(NOT TARGET ${TARGET_LIB_NAME})
+
+        message(STATUS "LIBRARY ${TARGET_LIB_NAME}")
 
         # Detect if recursion is needed
         if (NOT DEFINED ${LIB_NAME}_RECURSE)
@@ -1196,7 +1220,9 @@ function(SETUP_ARDUINO_EXAMPLE LIBRARY_NAME EXAMPLE_NAME OUTPUT_VAR)
     endforeach()
 
     if(EXAMPLE_SKETCH_PATH)
-        setup_arduino_sketch(${EXAMPLE_SKETCH_PATH} SKETCH_CPP)
+        setup_arduino_sketch(
+            SKETCH ${EXAMPLE_SKETCH_PATH}
+            SRCS SKETCH_CPP)
         set("${OUTPUT_VAR}" ${${OUTPUT_VAR}} ${SKETCH_CPP} PARENT_SCOPE)
     else()
         message(FATAL_ERROR "Could not find example ${EXAMPLE_NAME} from library ${LIBRARY_NAME}")
@@ -1206,16 +1232,22 @@ endfunction()
 #=============================================================================#
 # [PRIVATE/INTERNAL]
 #
-# setup_arduino_sketch(SKETCH_PATH OUTPUT_VAR)
+# setup_arduino_sketch()
 #
-#      SKETCH_PATH - Path to sketch directory
-#      OUTPUT_VAR  - Variable name where to save generated sketch source
+#      SKETCH - Path to sketch directory
+#      SRCS  - Variable name where to save generated sketch source
+#      DESKTOP_IGNORE  - Sources to ignore for desktop build
 #
 # Generates C++ sources from Arduino Sketch.
 #=============================================================================#
-function(SETUP_ARDUINO_SKETCH SKETCH_PATH OUTPUT_VAR)
-    get_filename_component(SKETCH_NAME "${SKETCH_PATH}" NAME)
-    get_filename_component(SKETCH_PATH "${SKETCH_PATH}" ABSOLUTE)
+function(SETUP_ARDUINO_SKETCH)
+
+    cmake_parse_arguments(INPUT "" "SKETCH;SRCS" "DESKTOP_IGNORE" ${ARGN})
+    error_for_unparsed(INPUT)
+    required_variables(VARS INPUT_SKETCH MSG "must define sketch path")
+
+    get_filename_component(SKETCH_NAME "${INPUT_SKETCH}" NAME)
+    get_filename_component(SKETCH_PATH "${INPUT_SKETCH}" ABSOLUTE)
 
     if(EXISTS "${SKETCH_PATH}")
         set(SKETCH_CPP  ${CMAKE_CURRENT_BINARY_DIR}/${SKETCH_NAME}.cpp)
@@ -1232,7 +1264,13 @@ function(SETUP_ARDUINO_SKETCH SKETCH_PATH OUTPUT_VAR)
 
         # Find all sketch files
         file(GLOB SKETCH_SOURCES ${SKETCH_PATH}/*.pde ${SKETCH_PATH}/*.ino)
+
         list(REMOVE_ITEM SKETCH_SOURCES ${MAIN_SKETCH})
+
+        if (ARDUINO_DESKTOP)
+            list(REMOVE_ITEM SKETCH_SOURCES ${MAIN_SKETCH} ${INPUT_DESKTOP_IGNORE})
+        endif()
+
         list(SORT SKETCH_SOURCES)
         
         generate_cpp_from_sketch("${MAIN_SKETCH}" "${SKETCH_SOURCES}" "${SKETCH_CPP}")
@@ -1245,7 +1283,7 @@ function(SETUP_ARDUINO_SKETCH SKETCH_PATH OUTPUT_VAR)
                            COMMENT "Regnerating ${SKETCH_NAME} Sketch")
         set_source_files_properties(${SKETCH_CPP} PROPERTIES GENERATED TRUE)
 
-        set("${OUTPUT_VAR}" ${${OUTPUT_VAR}} ${SKETCH_CPP} PARENT_SCOPE)
+        set("${INPUT_SRCS}" ${${INPUT_SRCS}} ${SKETCH_CPP} PARENT_SCOPE)
     else()
         message(FATAL_ERROR "Sketch does not exist: ${SKETCH_PDE}")
     endif()
