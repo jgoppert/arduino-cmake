@@ -173,9 +173,9 @@ function(GENERATE_ARDUINO_LIBRARY)
     find_arduino_libraries(
         LIBS TARGET_LIBS
         SRCS "${ALL_SRCS}")
-    set(LIB_DEP_INCLUDES)
+    set(LIB_COMPILE_FLAGS)
     foreach(LIB_DEP ${TARGET_LIBS})
-        set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
+        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} -I${LIB_DEP}")
     endforeach()
 
     if(NOT INPUT_NO_AUTOLIBS)
@@ -183,7 +183,7 @@ function(GENERATE_ARDUINO_LIBRARY)
             LIBRARIES ALL_LIBS
             BOARD ${INPUT_BOARD}
             SRCS "${ALL_SRCS}"
-            COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
+            COMPILE_FLAGS "${LIB_COMPILE_FLAGS}")
     endif()
 
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
@@ -198,7 +198,7 @@ endfunction()
 #=============================================================================#
 function(GENERATE_ARDUINO_FIRMWARE)
 
-    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE" ${ARGN})
+    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;DESKTOP_COMPILE_FLAGS;DESKTOP_SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_FIRMWARE MSG "must define name for target")
     message(STATUS "Generating ${INPUT_FIRMWARE}")
@@ -206,6 +206,9 @@ function(GENERATE_ARDUINO_FIRMWARE)
 
     set(ALL_LIBS)
     set(ALL_SRCS ${INPUT_SRCS} ${INPUT_HDRS})
+    if (ARDUINO_DESKTOP)
+        list(APPEND ALL_SRCS ${INPUT_DESKTOP_SRCS}) 
+    endif()
 
     setup_arduino_core(
         LIBRARY CORE_LIB
@@ -224,13 +227,17 @@ function(GENERATE_ARDUINO_FIRMWARE)
         LIBS TARGET_LIBS
         SRCS "${ALL_SRCS}")
 
-    set(LIB_DEP_INCLUDES)
+    set(LIB_COMPILE_FLAGS)
     foreach(LIB_DEP ${TARGET_LIBS})
-        set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
+        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} -I${LIB_DEP}")
     endforeach()
 
     if (ARDUINO_DESKTOP)
-        set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${CMAKE_SOURCE_DIR}/libraries/Desktop/include")
+        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} ${INPUT_DESKTOP_COMPILE_FLAGS}") 
+    endif()
+
+    if (ARDUINO_DESKTOP)
+        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} -I${CMAKE_SOURCE_DIR}/libraries/Desktop/include")
     endif()
 
     if(NOT INPUT_NO_AUTOLIBS)
@@ -238,7 +245,7 @@ function(GENERATE_ARDUINO_FIRMWARE)
             LIBRARIES ALL_LIBS
             BOARD "${INPUT_BOARD}"
             SRCS "${ALL_SRCS}"
-            COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
+            COMPILE_FLAGS "${LIB_COMPILE_FLAGS}")
     endif()
     
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
@@ -248,7 +255,7 @@ function(GENERATE_ARDUINO_FIRMWARE)
         BOARD "${INPUT_BOARD}"
         SRCS "${ALL_SRCS}"
         LIBS "${ALL_LIBS}"
-        COMPILE_FLAGS "-I${INPUT_SKETCH} ${LIB_DEP_INCLUDES}")
+        COMPILE_FLAGS "-I${INPUT_SKETCH} ${LIB_COMPILE_FLAGS}")
     
     if(INPUT_PORT)
         setup_arduino_upload(${INPUT_BOARD} ${INPUT_FIRMWARE} ${INPUT_PORT})
@@ -295,16 +302,16 @@ function(GENERATE_ARDUINO_EXAMPLE)
         LIBS TARGET_LIBS
         SRCS "${ALL_SRCS}")
 
-    set(LIB_DEP_INCLUDES)
+    set(LIB_COMPILE_FLAGS)
     foreach(LIB_DEP ${TARGET_LIBS})
-        set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
+        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} -I${LIB_DEP}")
     endforeach()
 
     setup_arduino_libraries(
             LIBRARIES ALL_LIBS
             BOARD "${INPUT_BOARD}"
             SRCS "${ALL_SRCS}"
-            COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
+            COMPILE_FLAGS "${LIB_COMPILE_FLAGS}")
 
     list(APPEND ALL_LIBS ${CORE_LIB} ${INPUT_LIBS})
     
@@ -313,7 +320,7 @@ function(GENERATE_ARDUINO_EXAMPLE)
         BOARD "${INPUT_BOARD}"
         SRCS "${ALL_SRCS}"
         LIBS "${ALL_LIBS}"
-        COMPILE_FLAGS "${LIB_DEP_INCLUDES}")
+        COMPILE_FLAGS "${LIB_COMPILE_FLAGS}")
 
     if(INPUT_PORT)
         setup_arduino_upload(${INPUT_BOARD} ${TARGET_NAME} ${INPUT_PORT})
@@ -492,7 +499,7 @@ function(find_arduino_libraries)
         foreach(INCLUDE_STRING ${INCLUDE_STRINGS})
             string(REGEX REPLACE "${INCLUDE_REGEX}" "\\1" INCLUDE_FILE "${INCLUDE_STRING}")
             get_filename_component(INCLUDE_NAME "${INCLUDE_FILE}" NAME_WE)
-            message(STATUS "include string: ${INCLUDE_STRING}")
+            #message(STATUS "include string: ${INCLUDE_STRING}")
             #message(STATUS "include file: ${INCLUDE_FILE}")
             #message(STATUS "include name: ${INCLUDE_NAME}")
             foreach(LIB_SEARCH_PATH ${LIB_SEARCH_PATHS})
@@ -679,9 +686,9 @@ function(setup_arduino_target)
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_TARGET INPUT_BOARD INPUT_SRCS MSG "must define name for library")
 
-    set(LIB_DEP_INCLUDES "")
+    set(LIB_COMPILE_FLAGS "")
     foreach(LIB_DEP ${INPUT_LIBS})
-        set(LIB_DEP_INCLUDES "${LIB_DEP_INCLUDES} -I${LIB_DEP}")
+        set(LIB_COMPILE_FLAGS "${LIB_COMPILE_FLAGS} -I${LIB_DEP}")
     endforeach()
 
     add_executable(${INPUT_TARGET} ${INPUT_SRCS})
@@ -690,7 +697,7 @@ function(setup_arduino_target)
     get_arduino_flags(ARDUINO_COMPILE_FLAGS ARDUINO_LINK_FLAGS  ${INPUT_BOARD})
 
     set_target_properties(${INPUT_TARGET} PROPERTIES
-                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${INPUT_COMPILE_FLAGS} ${LIB_DEP_INCLUDES}"
+                COMPILE_FLAGS "${ARDUINO_COMPILE_FLAGS} ${INPUT_COMPILE_FLAGS} ${LIB_COMPILE_FLAGS}"
                 LINK_FLAGS "${ARDUINO_LINK_FLAGS} ${INPUT_LINK_FLAGS}")
     target_link_libraries(${INPUT_TARGET} ${INPUT_LIBS} "-lc -lm")
 

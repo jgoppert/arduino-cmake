@@ -36,6 +36,27 @@ generate_arduino_firmware(
     SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
     BOARD mega2560
     PORT /dev/ttyUSB0
+    DESKTOP_SRCS 
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Arduino.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/DataFlash_APM1.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/desktop.h
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/digital.c
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/eeprom.c
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/FastSerial.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/main.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Print.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_adc.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_adc.h
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_barometer.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_compass.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_gps.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_rc.h
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/SPI.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/util.cpp
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/util.h
+        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/WString.cpp
+    DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"Blink\\\""
     NO_AUTOLIBS)
 
 #generate_arduino_example(
