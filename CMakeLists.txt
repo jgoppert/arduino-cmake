@@ -34,19 +34,21 @@ endif()
 
 file(GLOB APM_DESKTOP_SUPPORT_SRCS "${CMAKE_SOURCE_DIR}/libraries/Desktop/support/*")
 
-generate_arduino_firmware(
-    FIRMWARE Blink
-    SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
-    BOARD mega2560
-    PORT /dev/ttyUSB0
-    DESKTOP
-    DESKTOP_SRCS
-        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/main.cpp
-        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Arduino.cpp
-        ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/FastSerial.cpp
-    DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"Blink\\\""
-    NO_AUTOLIBS
-    )
+#generate_arduino_firmware(
+    #FIRMWARE Blink
+    #SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
+    #BOARD mega2560
+    #PORT /dev/ttyUSB0
+    #DESKTOP
+    #DESKTOP_SRCS
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/main.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Arduino.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/FastSerial.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_gps.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl.cpp
+    #DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"Blink\\\""
+    #NO_AUTOLIBS
+    #)
 
 #generate_arduino_example(
     #EXAMPLE SoftwareSerialExample
@@ -68,14 +70,15 @@ if (TEST)
         FIRMWARE ArduPlane
         SKETCH ${CMAKE_SOURCE_DIR}/test/ArduPlane
         BOARD mega2560
-        #DESKTOP
-        #DESKTOP_IGNORE
-            #I2C/I2C.cpp
-            #DataFlash/DataFlash_APM1.cpp
-            #FastSerial/FastSerial.cpp
-            #AP_Compass/AP_Compass_HMC5843.cpp
-            #AP_Baro/AP_Baro_BMP085.cpp
+        DESKTOP
+        DESKTOP_IGNORE
+            I2C/I2C.cpp
+            DataFlash/DataFlash_APM1.cpp
+            FastSerial/FastSerial.cpp
+            AP_Compass/AP_Compass_HMC5843.cpp
+            AP_Baro/AP_Baro_BMP085.cpp
         DESKTOP_SRCS ${APM_DESKTOP_SUPPORT_SRCS}
+        DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"ArduPlane\\\""
         PORT /dev/ttyUSB0)
 
     #generate_arduino_firmware(

@@ -6,10 +6,10 @@
  */
 
 #include "config.h"
-//#include <FastSerial.h>
+#include <FastSerial.h>
 
 Test1 a;
-//FastSerialPort0(Serial);        // FTDI/console
+FastSerialPort0(Serial);        // FTDI/console
 
 void setup() {                
   // initialize the digital pin as an output.
@@ -18,6 +18,7 @@ void setup() {
   /*
     This is a weird comment
   //*/
+  Serial.begin(115200);
 }
 
 void loop() {
@@ -25,5 +26,5 @@ void loop() {
   delay(1000);              // wait for a second
   digitalWrite(13, LOW);    // set the LED off
   delay(1000);              // wait for a second
-  //Serial.println("hello");
+  Serial.println("hello");
 }

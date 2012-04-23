@@ -22,7 +22,13 @@
 #include <signal.h>
 #include <math.h>
 #include <APM_RC.h>
+
+#if (ARDUINO >= 100)
+#include <Arduino.h>
+#else
 #include <wiring.h>
+#endif
+
 #include <AP_PeriodicProcess.h>
 #include <AP_TimerProcess.h>
 #include <GCS_MAVLink.h>
