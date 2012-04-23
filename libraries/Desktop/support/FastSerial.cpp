@@ -331,6 +331,27 @@ void FastSerial::flush(void)
 {
 }
 
+#if defined(ARDUINO) && ARDUINO >= 100
+size_t FastSerial::write(uint8_t c)
+{
+	struct tcp_state *s = &tcp_state[_u2x];
+	int flags = MSG_NOSIGNAL;
+	check_connection(s);
+	if (!s->connected) {
+		return 0;
+	}
+	if (!desktop_state.slider) {
+		flags |= MSG_DONTWAIT;
+	}
+	if (s->console) {
+		::write(s->fd, &c, 1);
+	} else {
+		send(s->fd, &c, 1, flags);
+	}
+	// return number of bytes written (always 1)
+    return 1;
+}
+#else
 void FastSerial::write(uint8_t c)
 {
 	struct tcp_state *s = &tcp_state[_u2x];
@@ -348,6 +369,7 @@ void FastSerial::write(uint8_t c)
 		send(s->fd, &c, 1, flags);
 	}
 }
+#endif
 
 // Buffer management ///////////////////////////////////////////////////////////
 
