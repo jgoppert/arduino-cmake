@@ -39,18 +39,21 @@ generate_arduino_firmware(
     SKETCH ${CMAKE_SOURCE_DIR}/example/Blink
     BOARD mega2560
     PORT /dev/ttyUSB0
+    DESKTOP
     DESKTOP_SRCS
         ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/main.cpp
         ${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Arduino.cpp
         #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/FastSerial.cpp
     DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"Blink\\\""
-    NO_AUTOLIBS)
+    NO_AUTOLIBS
+    )
 
-#generate_arduino_example(
-    #EXAMPLE SoftwareSerialExample
-    #BOARD mega2560
-    #LIBRARY SoftwareSerial
-    #PORT /dev/ttyUSB0)
+generate_arduino_example(
+    EXAMPLE SoftwareSerialExample
+    BOARD mega2560
+    LIBRARY SoftwareSerial
+    PORT /dev/ttyUSB0
+    )
 
 if (TEST)
 

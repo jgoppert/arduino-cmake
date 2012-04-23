@@ -16,6 +16,7 @@
 #      SERIAL         # Serial command for serial target
 #      NO_AUTOLIBS    # Disables Arduino library detection
 #      DESKTOP_IGNORE # Sources to ignore for Desktop build
+#      DESKTOP        # Enables the desktop build
 #
 # Here is a short example for a target named test:
 #    
@@ -198,11 +199,15 @@ endfunction()
 #=============================================================================#
 function(GENERATE_ARDUINO_FIRMWARE)
 
-    cmake_parse_arguments(INPUT "NO_AUTOLIBS" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;DESKTOP_COMPILE_FLAGS;DESKTOP_SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE" ${ARGN})
+    cmake_parse_arguments(INPUT "NO_AUTOLIBS;DESKTOP" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;DESKTOP_COMPILE_FLAGS;DESKTOP_SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_FIRMWARE MSG "must define name for target")
     message(STATUS "Generating ${INPUT_FIRMWARE}")
     required_variables(VARS INPUT_BOARD MSG "must define for target ${INPUT_FIRMWARE}")
+
+    if ( (NOT INPUT_DESKTOP) AND ARDUINO_DESKTOP)
+        return()
+    endif()
 
     set(ALL_LIBS)
     set(ALL_SRCS ${INPUT_SRCS} ${INPUT_HDRS})
@@ -274,10 +279,14 @@ endfunction()
 #=============================================================================#
 function(GENERATE_ARDUINO_EXAMPLE)
 
-    cmake_parse_arguments(INPUT "" "LIBRARY;EXAMPLE;BOARD;PORT;SERIAL" "" ${ARGN})
+    cmake_parse_arguments(INPUT "DESKTOP" "LIBRARY;EXAMPLE;BOARD;PORT;SERIAL" "" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_EXAMPLE MSG "must define name for example")
     required_variables(VARS INPUT_BOARD INPUT_LIBRARY MSG "must define for example ${INPUT_EXAMPLE}")
+
+    if ( (NOT INPUT_DESKTOP) AND ARDUINO_DESKTOP)
+        return()
+    endif()
 
     set(TARGET_NAME "example-${INPUT_LIBRARY}-${INPUT_EXAMPLE}")
 
