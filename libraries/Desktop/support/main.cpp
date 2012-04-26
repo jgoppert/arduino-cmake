@@ -1,7 +1,3 @@
-#if (ARDUINO >= 100)
-#include <Arduino.h>
-#endif
-
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
@@ -80,7 +76,7 @@ int main(int argc, char * const argv[])
 		}
 	}
 
-	//sitl_setup();
+	sitl_setup();
 	setup();
 
 	while (true) {
@@ -97,7 +93,7 @@ int main(int argc, char * const argv[])
 		FD_ZERO(&fds);
 		loop();
 
-		//desktop_serial_select_setup(&fds, &fd_high);
+		desktop_serial_select_setup(&fds, &fd_high);
 		tv.tv_sec = 0;
 		tv.tv_usec = 100;
 

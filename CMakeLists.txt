@@ -41,11 +41,25 @@ file(GLOB APM_DESKTOP_SUPPORT_SRCS "${CMAKE_SOURCE_DIR}/libraries/Desktop/suppor
     #PORT /dev/ttyUSB0
     #DESKTOP
     #DESKTOP_SRCS
-        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/main.cpp
         #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Arduino.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/DataFlash_APM1.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/desktop.h
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/digital.c
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/eeprom.c
         #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/FastSerial.cpp
-        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_gps.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/main.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/Print.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_adc.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_adc.h
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_barometer.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_compass.cpp
         #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_gps.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/sitl_rc.h
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/SPI.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/util.cpp
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/util.h
+        #${CMAKE_SOURCE_DIR}/libraries/Desktop/support/WString.cpp
     #DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"Blink\\\""
     #NO_AUTOLIBS
     #)
@@ -70,8 +84,11 @@ if (TEST)
         FIRMWARE ArduPlane
         SKETCH ${CMAKE_SOURCE_DIR}/test/ArduPlane
         BOARD mega2560
+        PORT /dev/ttyUSB0
+
+        # these are the options for the desktop build
         DESKTOP
-        DESKTOP_IGNORE
+        DESKTOP_IGNORE_SRCS
             I2C/I2C.cpp
             DataFlash/DataFlash_APM1.cpp
             FastSerial/FastSerial.cpp
@@ -79,7 +96,7 @@ if (TEST)
             AP_Baro/AP_Baro_BMP085.cpp
         DESKTOP_SRCS ${APM_DESKTOP_SUPPORT_SRCS}
         DESKTOP_COMPILE_FLAGS "-I${CMAKE_SOURCE_DIR}/libraries/Desktop/include -DSKETCH=\\\"ArduPlane\\\""
-        PORT /dev/ttyUSB0)
+        )
 
     #generate_arduino_firmware(
         #FIRMWARE ArduCopter

@@ -15,7 +15,7 @@
 #      AFLAGS         # Override global Avrdude flags for target
 #      SERIAL         # Serial command for serial target
 #      NO_AUTOLIBS    # Disables Arduino library detection
-#      DESKTOP_IGNORE # Sources to ignore for Desktop build
+#      DESKTOP_IGNORE_SRCS # Sources to ignore for Desktop build
 #      DESKTOP        # Enables the desktop build
 #
 # Here is a short example for a target named test:
@@ -199,7 +199,7 @@ endfunction()
 #=============================================================================#
 function(GENERATE_ARDUINO_FIRMWARE)
 
-    cmake_parse_arguments(INPUT "NO_AUTOLIBS;DESKTOP" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;DESKTOP_COMPILE_FLAGS;DESKTOP_SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE" ${ARGN})
+    cmake_parse_arguments(INPUT "NO_AUTOLIBS;DESKTOP" "FIRMWARE;BOARD;PORT;SKETCH;SERIAL" "SRCS;DESKTOP_COMPILE_FLAGS;DESKTOP_SRCS;HDRS;LIBS;AFLAGS;DESKTOP_IGNORE_SRCS" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_FIRMWARE MSG "must define name for target")
     message(STATUS "Generating ${INPUT_FIRMWARE}")
@@ -225,7 +225,7 @@ function(GENERATE_ARDUINO_FIRMWARE)
         setup_arduino_sketch(
             SKETCH "${INPUT_SKETCH}"
             SRCS ALL_SRCS
-            DESKTOP_IGNORE "${INPUT_DESKTOP_IGNORE}")
+            DESKTOP_IGNORE_SRCS "${INPUT_DESKTOP_IGNORE_SRCS}")
     endif()
 
     required_variables(VARS ALL_SRCS MSG "must define SRCS or SKETCH for target ${INPUT_FIRMWARE}")
@@ -511,7 +511,11 @@ function(find_arduino_libraries)
             #message(STATUS "include name: ${INCLUDE_NAME}")
             foreach(LIB_SEARCH_PATH ${LIB_SEARCH_PATHS})
                 if(EXISTS ${LIB_SEARCH_PATH}/${INCLUDE_NAME}/${INCLUDE_FILE})
-                    list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${INCLUDE_NAME})
+                    # check if this library is ignored
+                    list(FIND INPUT_IGNORE_LIBS "${INCLUDE_NAME}" FOUND_IGNORE)
+                    if (FOUND_IGNORE EQUAL -1)
+                        list(APPEND ARDUINO_LIBS ${LIB_SEARCH_PATH}/${INCLUDE_NAME})
+                    endif()
                     break()
                 endif()
             endforeach()
@@ -643,13 +647,16 @@ endfunction()
 #        SRCS           - source files
 #        COMPILE_FLAGS  - Compile flags
 #        LINK_FLAGS     - Linker flags
+#        IGNORE_SRCS    - sources to ignore
 #
 # Finds and creates all dependency libraries based on sources.
 #
 #=============================================================================#
 function(setup_arduino_libraries)
 
-    cmake_parse_arguments(INPUT "" "LIBRARIES;BOARD" "SRCS;COMPILE_FLAGS;LINK_FLAGS" ${ARGN})
+    cmake_parse_arguments(INPUT ""
+        "LIBRARIES;BOARD"
+        "SRCS;IGNORE_SRCS;COMPILE_FLAGS;LINK_FLAGS" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_BOARD INPUT_SRCS MSG "must define") 
 
@@ -661,8 +668,9 @@ function(setup_arduino_libraries)
         # Create static library instead of returning sources
         setup_arduino_library(
             LIBRARIES LIB_DEPS
-            BOARD ${INPUT_BOARD}
-            LIB_PATH ${TARGET_LIB}
+            BOARD "${INPUT_BOARD}"
+            LIB_PATH "${TARGET_LIB}"
+            IGNORE_SRCS "${INPUT_IGNORE_SRCS}"
             COMPILE_FLAGS "${INPUT_COMPILE_FLAGS}"
             LINK_FLAGS "${INPUT_LINK_FLAGS}")
         list(APPEND LIB_TARGETS ${LIB_DEPS})
@@ -1270,13 +1278,13 @@ endfunction()
 #
 #      SKETCH - Path to sketch directory
 #      SRCS  - Variable name where to save generated sketch source
-#      DESKTOP_IGNORE  - Sources to ignore for desktop build
+#      DESKTOP_IGNORE_SRCS  - Sources to ignore for desktop build
 #
 # Generates C++ sources from Arduino Sketch.
 #=============================================================================#
 function(SETUP_ARDUINO_SKETCH)
 
-    cmake_parse_arguments(INPUT "" "SKETCH;SRCS" "DESKTOP_IGNORE" ${ARGN})
+    cmake_parse_arguments(INPUT "" "SKETCH;SRCS" "DESKTOP_IGNORE_SRCS" ${ARGN})
     error_for_unparsed(INPUT)
     required_variables(VARS INPUT_SKETCH MSG "must define sketch path")
 
@@ -1302,7 +1310,7 @@ function(SETUP_ARDUINO_SKETCH)
         list(REMOVE_ITEM SKETCH_SOURCES ${MAIN_SKETCH})
 
         if (ARDUINO_DESKTOP)
-            list(REMOVE_ITEM SKETCH_SOURCES ${MAIN_SKETCH} ${INPUT_DESKTOP_IGNORE})
+            list(REMOVE_ITEM SKETCH_SOURCES ${MAIN_SKETCH} ${INPUT_DESKTOP_IGNORE_SRCS})
         endif()
 
         #foreach(SKETCH_SOURCE ${SKETCH_SOURCES})

@@ -8,7 +8,7 @@
 #define _VECTOR(N) __vector_ ## N
 #define _BV(bit) (1 << (bit))
 
-//extern "C" volatile uint8_t __iomem[1024];
+extern "C" volatile uint8_t __iomem[1024];
 
 #define _SFR_MEM8(addr)  __iomem[addr]
 #define _SFR_MEM16(addr) (*(uint16_t *)&__iomem[addr])

@@ -1,9 +1,4 @@
-#if (ARDUINO >= 100) 
-#include "Arduino.h"
-#else
 #include "WProgram.h"
-#endif
-
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
