@@ -22,13 +22,6 @@ generate_arduino_firmware(blink_original
     PORT  /dev/ttyUSB0
     BOARD mega)
 
-generate_arduino_firmware(Test2
-    SKETCH ${CMAKE_SOURCE_DIR}/example/Test2
-    PORT  /dev/ttyUSB0
-    BOARD mega)
-
-
-
 # Alternative: by variables
 #set(blink_original_SKETCH ${ARDUINO_SDK_PATH}/examples/1.Basics/Blink)
 #set(blink_original_PORT  ${ARDUINO_PORT})
