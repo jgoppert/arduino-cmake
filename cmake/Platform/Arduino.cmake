@@ -1299,6 +1299,7 @@ endfunction()
 function(SETUP_ARDUINO_SKETCH TARGET_NAME SKETCH_PATH OUTPUT_VAR)
     get_filename_component(SKETCH_NAME "${SKETCH_PATH}" NAME)
     get_filename_component(SKETCH_PATH "${SKETCH_PATH}" ABSOLUTE)
+    message(STATUS "sketch path: ${SKETCH_PATH}")
 
     if(EXISTS "${SKETCH_PATH}")
         set(SKETCH_CPP  ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}_${SKETCH_NAME}.cpp)

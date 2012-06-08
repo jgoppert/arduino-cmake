@@ -19,8 +19,15 @@ generate_arduino_example(Wire master_writer)
 #====================================================================#
 generate_arduino_firmware(blink_original
     SKETCH ${ARDUINO_SDK_PATH}/examples/1.Basics/Blink
-    PORT  /dev/ttyACM0
-    BOARD uno)
+    PORT  /dev/ttyUSB0
+    BOARD mega)
+
+generate_arduino_firmware(Test2
+    SKETCH ${CMAKE_SOURCE_DIR}/example/Test2
+    PORT  /dev/ttyUSB0
+    BOARD mega)
+
+
 
 # Alternative: by variables
 #set(blink_original_SKETCH ${ARDUINO_SDK_PATH}/examples/1.Basics/Blink)
