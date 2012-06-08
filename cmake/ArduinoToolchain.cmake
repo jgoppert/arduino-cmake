@@ -36,7 +36,12 @@ endif()
 #=============================================================================#
 #                         Detect Arduino SDK                                  #
 #=============================================================================#
-if(NOT ARDUINO_SDK_PATH)
+
+set(ARDUINO_SDK_PATH CACHE STRING "")
+
+if("${ARDUINO_SDK_PATH}" STREQUAL "")
+    message(STATUS "finding arduino sdk") 
+
     set(ARDUINO_PATHS)
     foreach(VERSION 22 1)
         list(APPEND ARDUINO_PATHS arduino-00${VERSION})
@@ -47,19 +52,20 @@ if(NOT ARDUINO_SDK_PATH)
                              /usr/local/share/arduino*)
     list(SORT SDK_PATH_HINTS)
     list(REVERSE SDK_PATH_HINTS)
+
+    find_path(ARDUINO_SDK_PATH
+              NAMES lib/version.txt
+              PATH_SUFFIXES share/arduino
+                            Arduino.app/Contents/Resources/Java/
+                            ${ARDUINO_PATHS}
+              HINTS ${SDK_PATH_HINTS}
+              DOC "Arduino SDK path.")
+
+    if("${ARDUINO_SDK_PATH}" STREQUAL "ARDUINO_SDK_PATH-NOTFOUND")
+        message(FATAL_ERROR "Could not find Arduino SDK (set ARDUINO_SDK_PATH)!")
+    else()
+        list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${ARDUINO_SDK_PATH}/hardware/tools/avr/bin)
+        list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${ARDUINO_SDK_PATH}/hardware/tools/avr/utils/bin)
+    endif()
 endif()
 
-find_path(ARDUINO_SDK_PATH
-          NAMES lib/version.txt
-          PATH_SUFFIXES share/arduino
-                        Arduino.app/Contents/Resources/Java/
-                        ${ARDUINO_PATHS}
-          HINTS ${SDK_PATH_HINTS}
-          DOC "Arduino SDK path.")
-
-if(ARDUINO_SDK_PATH)
-    list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${ARDUINO_SDK_PATH}/hardware/tools/avr/bin)
-    list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${ARDUINO_SDK_PATH}/hardware/tools/avr/utils/bin)
-else()
-    message(FATAL_ERROR "Could not find Arduino SDK (set ARDUINO_SDK_PATH)!")
-endif()
