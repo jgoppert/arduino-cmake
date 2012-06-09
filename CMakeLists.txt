@@ -5,7 +5,6 @@
 # Description: Arduino CMake example                                          #
 #                                                                             #
 #=============================================================================#
-configure_file(cmake/ArduinoSystemConfig.cmake.in ArduinoSystemConfig.cmake)
 set(CMAKE_TOOLCHAIN_FILE cmake/ArduinoToolchain.cmake) # Arduino Toolchain
 
 
